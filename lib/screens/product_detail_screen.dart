@@ -47,7 +47,7 @@ class ProductDetailScreen extends StatelessWidget {
             // 6. The large product image
             imageUrl != null
                 ? Image.network(
-                    imageUrl!,
+                    imageUrl,
                     height: 300, // Give it a fixed height
                     fit: BoxFit.cover, // Make it fill the space
                     // 7. Add the same loading/error builders as the card

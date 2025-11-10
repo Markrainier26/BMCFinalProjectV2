@@ -6,6 +6,7 @@ import 'package:ecommers_app/screens/admin_panel_screen.dart';
 import 'package:ecommers_app/providers/cart_provider.dart'; // 1. ADD THIS
 import 'package:ecommers_app/screens/cart_screen.dart'; // 2. ADD THIS
 import 'package:provider/provider.dart'; // 3. ADD THIS
+import 'package:ecommers_app/screens/order_history_screen.dart'; // 1. ADD THIS
 
 
 
@@ -93,29 +94,64 @@ class _HomeScreenState extends State<HomeScreen> {
           Consumer<CartProvider>(
             // 2. The "builder" function rebuilds *only* the icon
             builder: (context, cart, child) {
-              // 3. The "Badge" widget adds a small label
-              return Badge(
-                // 4. Get the count from the provider
-                label: Text(cart.itemCount.toString()),
-                // 5. Only show the badge if the count is > 0
-                isLabelVisible: cart.itemCount > 0,
-                // 6. This is the child (our icon button)
-                child: IconButton(
-                  icon: const Icon(Icons.shopping_cart),
-                  onPressed: () {
-                    // 7. Navigate to the CartScreen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const CartScreen(),
+              // 3. Custom badge implementation using Stack
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart),
+                    onPressed: () {
+                      // 4. Navigate to the CartScreen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CartScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  // 5. Only show the badge if the count is > 0
+                  if (cart.itemCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          cart.itemCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                ],
+              );
+            },
+          ),
+
+          // 2. --- ADD THIS NEW BUTTON ---
+          IconButton(
+            icon: const Icon(Icons.receipt_long), // A "receipt" icon
+            tooltip: 'My Orders',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const OrderHistoryScreen(),
                 ),
               );
             },
           ),
 
-          // 2. --- THIS IS THE MAGIC ---
+          // 3. --- THIS IS THE MAGIC ---
           //    This is a "collection-if". The IconButton will only
           //    be built IF _userRole is equal to 'admin'.
           if (_userRole == 'admin')
@@ -131,11 +167,11 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-          // 4. The logout button (always visible)
+          // 5. The logout button (always visible)
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
-            onPressed: _signOut, // 5. Call our _signOut function
+            onPressed: _signOut, // 6. Call our _signOut function
           ),
         ],
       ),
