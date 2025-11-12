@@ -14,28 +14,49 @@ class _AdminOrderScreenState extends State<AdminOrderScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // 2. This is the function that updates the status in Firestore
-  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
+  // 1. MODIFY this function to accept userId
+  Future<void> _updateOrderStatus(String orderId, String newStatus, String userId) async {
     try {
       // 3. Find the document and update the 'status' field
       await _firestore.collection('orders').doc(orderId).update({
         'status': newStatus,
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order status updated!')),
-      );
+
+      // 3. --- ADD THIS NEW LOGIC ---
+      //    Create a new notification document
+      await _firestore.collection('notifications').add({
+        'userId': userId, // 4. The user this notification is for
+        'title': 'Order Status Updated',
+        'body': 'Your order ($orderId) has been updated to "$newStatus".',
+        'orderId': orderId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false, // 5. Mark it as unread
+      });
+      // --- END OF NEW LOGIC ---
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order status updated!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update status: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: $e')),
+        );
+      }
     }
   }
 
-  // 4. This function shows the update dialog
-  void _showStatusDialog(String orderId, String currentStatus) {
+  // --- THIS IS THE FIXED FUNCTION ---
+  // It now uses 'dialogContext' to pop, fixing the crash
+  // 1. MODIFY this function to accept userId
+  void _showStatusDialog(String orderId, String currentStatus, String userId) {
     showDialog(
-      context: context,
-      builder: (context) {
-        // 5. A list of all possible statuses
+      context: context, // This is the main screen's context
+
+      // 1. RENAME this variable to 'dialogContext'
+      builder: (dialogContext) {
         const statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
         return AlertDialog(
@@ -50,15 +71,17 @@ class _AdminOrderScreenState extends State<AdminOrderScreen> {
                 trailing: currentStatus == status ? const Icon(Icons.check) : null,
                 onTap: () {
                   // 8. When tapped:
-                  _updateOrderStatus(orderId, status); // Call update
-                  Navigator.of(context).pop(); // Close the dialog
+                  _updateOrderStatus(orderId, status, userId); // 2. PASS userId to our update function
+                  // 2. FIX: Use 'dialogContext' to pop
+                  Navigator.of(dialogContext).pop();
                 },
               );
             }).toList(),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              // 3. FIX: Use 'dialogContext' to pop here too
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Close'),
             )
           ],
@@ -66,6 +89,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen> {
       },
     );
   }
+  // --- END OF FIX ---
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +163,9 @@ class _AdminOrderScreenState extends State<AdminOrderScreen> {
 
                   // 9. On tap, show our update dialog
                   onTap: () {
-                    _showStatusDialog(order.id, status);
+                    // 3. PASS userId from the order data to our dialog
+                    final String userId = orderData['userId'] ?? 'Unknown User';
+                    _showStatusDialog(order.id, status, userId);
                   },
                 ),
               );

@@ -38,7 +38,6 @@ class CartItem {
 }
 
 class CartProvider with ChangeNotifier {
-
   // 4. Change this: _items is no longer final
   List<CartItem> _items = [];
 
@@ -52,11 +51,34 @@ class CartProvider with ChangeNotifier {
 
   List<CartItem> get items => [..._items];
 
-  double get totalPrice {
-    return _items.fold(0.0, (total, item) => total + (item.price * item.quantity));
+  // --- THIS IS THE GETTERS SECTION ---
+
+  // 1. RENAME 'totalPrice' to 'subtotal'
+  //    This is the total price *before* tax.
+  double get subtotal {
+    double total = 0.0;
+    for (var item in _items) {
+      total += (item.price * item.quantity);
+    }
+    return total;
   }
 
-  int get itemCount => _items.length;
+  // 2. ADD this new getter for VAT (12%)
+  double get vat {
+    return subtotal * 0.12; // 12% of the subtotal
+  }
+
+  // 3. ADD this new getter for the FINAL total
+  double get totalPriceWithVat {
+    return subtotal + vat;
+  }
+
+  // 4. We can leave the old 'totalPrice' getter for now,
+  //    or delete it. Let's update 'itemCount' to be cleaner:
+  int get itemCount {
+    // This 'fold' is a cleaner way to sum a list.
+    return _items.fold(0, (total, item) => total + item.quantity);
+  }
 
   // 7. ADD THIS CONSTRUCTOR
   CartProvider() {
@@ -96,7 +118,7 @@ class CartProvider with ChangeNotifier {
         _items = [];
       }
     } catch (e) {
-      _items = []; // On error, default to an empty cart
+      _items = []; // On error, default to empty cart
     }
     notifyListeners(); // Update the UI
   }
@@ -152,25 +174,31 @@ class CartProvider with ChangeNotifier {
       final List<Map<String, dynamic>> cartData =
           _items.map((item) => item.toJson()).toList();
 
-      // 4. Get total price and item count from our getters
-      final double total = totalPrice;
+      // 1. --- THIS IS THE CHANGE ---
+      //    Get all our new calculated values
+      final double sub = subtotal;
+      final double v = vat;
+      final double total = totalPriceWithVat;
       final int count = itemCount;
 
-      // 5. Create a new document in the 'orders' collection
+      // 2. Update the data we save to Firestore
       await _firestore.collection('orders').add({
         'userId': _userId,
-        'items': cartData, // Our list of item maps
-        'totalPrice': total,
+        'items': cartData,
+        'subtotal': sub,       // 3. ADD THIS
+        'vat': v,            // 4. ADD THIS
+        'totalPrice': total,   // 5. This is now the VAT-inclusive price
         'itemCount': count,
-        'status': 'Pending', // 6. IMPORTANT: For admin verification
-        'createdAt': FieldValue.serverTimestamp(), // For sorting
+        'status': 'Pending',
+        'createdAt': FieldValue.serverTimestamp(),
       });
+      // --- END OF CHANGE ---
 
       // 7. Note: We DO NOT clear the cart here.
       //    We'll call clearCart() separately from the UI after this succeeds.
 
     } catch (e) {
-      debugPrint('Error placing order: $e');
+      // Removed debug print statement
       // 8. Re-throw the error so the UI can catch it
       rethrow;
     }
@@ -188,9 +216,9 @@ class CartProvider with ChangeNotifier {
         await _firestore.collection('userCarts').doc(_userId).set({
           'cartItems': [],
         });
-        debugPrint('Firestore cart cleared.');
+        // Removed debug print statement
       } catch (e) {
-        debugPrint('Error clearing Firestore cart: $e');
+        // Removed debug print statement
       }
     }
 

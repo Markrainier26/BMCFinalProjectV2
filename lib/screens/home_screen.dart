@@ -7,6 +7,9 @@ import 'package:ecommers_app/providers/cart_provider.dart'; // 1. ADD THIS
 import 'package:ecommers_app/screens/cart_screen.dart'; // 2. ADD THIS
 import 'package:provider/provider.dart'; // 3. ADD THIS
 import 'package:ecommers_app/screens/order_history_screen.dart'; // 1. ADD THIS
+import 'package:ecommers_app/screens/profile_screen.dart'; // 1. ADD THIS
+import 'package:ecommers_app/widgets/notification_icon.dart'; // 1. ADD THIS
+import 'package:ecommers_app/screens/chat_screen.dart'; // 1. ADD THIS
 
 
 
@@ -23,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userRole = 'user';
   // 2. Get the current user from Firebase Auth
   final User? _currentUser = FirebaseAuth.instance.currentUser;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // 3. This function runs ONCE when the screen is first created
   @override
@@ -138,7 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-          // 2. --- ADD THIS NEW BUTTON ---
+          // 2. --- ADD OUR NEW WIDGET ---
+          const NotificationIcon(),
+          // --- END OF NEW WIDGET ---
+
+          // 3. --- ADD THIS NEW BUTTON ---
           IconButton(
             icon: const Icon(Icons.receipt_long), // A "receipt" icon
             tooltip: 'My Orders',
@@ -151,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-          // 3. --- THIS IS THE MAGIC ---
+          // 4. --- THIS IS THE MAGIC ---
           //    This is a "collection-if". The IconButton will only
           //    be built IF _userRole is equal to 'admin'.
           if (_userRole == 'admin')
@@ -167,11 +175,27 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-          // 5. The logout button (always visible)
+          // 6. --- THIS IS THE CHANGE ---
+          //    DELETE the old "Logout" IconButton
+          /*
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
-            onPressed: _signOut, // 6. Call our _signOut function
+            onPressed: _signOut, // We are deleting this
+          ),
+          */
+
+          // 7. ADD this new "Profile" IconButton
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ProfileScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -181,13 +205,13 @@ class _HomeScreenState extends State<HomeScreen> {
             .collection('products')
             .orderBy('createdAt', descending: true) // 3. Show newest first
             .snapshots(),
-        
+
         builder: (context, snapshot) {
           // 5. STATE 1: While data is loading
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           // 6. STATE 2: If an error occurs
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -218,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
               final productDoc = products[index];
               // 2. Get the data map
               final productData = productDoc.data() as Map<String, dynamic>;
-              
+
               return ProductCard(
                 productName: productData['name'] ?? 'Unknown Product',
                 price: (productData['price'] as num?)?.toDouble() ?? 0.0,
@@ -230,7 +254,37 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+      floatingActionButton: _userRole == 'user'
+          ? StreamBuilder<DocumentSnapshot>(
+              stream: _firestore.collection('chats').doc(_currentUser!.uid).snapshots(),
+              builder: (context, snapshot) {
+                int unreadCount = 0;
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data = snapshot.data!.data();
+                  if (data != null) {
+                    unreadCount = (data as Map<String, dynamic>)['unreadByUserCount'] ?? 0;
+                  }
+                }
+                return Badge(
+                  label: Text('$unreadCount'),
+                  isLabelVisible: unreadCount > 0,
+                  child: FloatingActionButton.extended(
+                    icon: const Icon(Icons.support_agent),
+                    label: const Text('Contact Admin'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            chatRoomId: _currentUser!.uid,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            )
+          : null,
     );
   }
 }
-
